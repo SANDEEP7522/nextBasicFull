@@ -1,20 +1,36 @@
+import User from "@/models/userModel";
 import nodeMailer from "nodemailer";
+import bcryptjs from "bcryptjs";
 
-export const sendMail = async ({ email, emailType, userId }:any) => {
+export const sendMail = async ({ email, emailType, userId }: any) => {
   try {
- 
-     // TODO: configure email for user Later
+    // create hashed token
+    const hashToken = await bcryptjs.hash(userId.toString(), 10);
 
+    // update user
+    if (emailType === "VERIFY") {
+      await User.findByIdAndUpdate(userId, {
+        verifyToken: hashToken,
+        verifyTokenExpiry: Date.now() + 3600000,
+      });
+    } else if (emailType === "RESET") {
+      await User.findByIdAndUpdate(userId, {
+        forgetPasswordToken: hashToken,
+        forgetPasswordTokenExpiry: Date.now() + 3600000,
+      });
+    }
+
+    // Looking to send emails in production? Check out our Email API/SMTP product!
     const transporter = nodeMailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
+      host: "sandbox.smtp.mailtrap.io",
+      port: 2525,
       auth: {
         user: process.env.SMTP_EMAIL,
         pass: process.env.SMTP_PASSWORD,
       },
     });
 
+    // send mail with defined transport object
     const mailOptions = {
       from: process.env.SENDER_EMAIL,
       to: email,
@@ -28,9 +44,17 @@ export const sendMail = async ({ email, emailType, userId }:any) => {
             return "Email from Next Auth";
         }
       })(),
-      
-      text: "",
-      html: `<p>Click <a href="http://localhost:3000/verify/${userId}">here</a> to verify your email</p>`,
+
+      html: (() => {
+        switch (emailType) {
+          case "VERIFY":
+            return `<p>Click <a href="${process.env.DOMAIN}/verifyemail?token=${hashToken}">here</a> to verify your email</p>`;
+          case "RESET":
+            return `<p>Click <a href="${process.env.DOMAIN}/reset-password/${hashToken}">here</a> to reset your password</p>`;
+          default:
+            return `<p>This is a default email message.</p>`;
+        }
+      })(),
     };
 
     await transporter.sendMail(mailOptions);
@@ -38,4 +62,3 @@ export const sendMail = async ({ email, emailType, userId }:any) => {
     console.error(error);
   }
 };
-
