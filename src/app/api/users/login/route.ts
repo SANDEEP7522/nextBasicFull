@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     
     // set token as cookie in the response
     response.cookies.set("token", token, {
-      httpOnly: true,
+      httpOnly: true, // accessible only by the web server and not by javascript code running in the browser
     });
 
     return response;
